@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build with MSBuild
+      run: msbuild EdgeSavedPasswordsDumper\EdgeSavedPasswordsDumper.sln /p:Configuration=Release /p:Platform="Any CPU"
+
+    - name: Generate SHA256 Hash
+      shell: pwsh
+      run: |
+        $exePath = "EdgeSavedPasswordsDumper\bin\Release\EdgeSavedPasswordsDumper.exe"
+        $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
+        "$hash  EdgeSavedPasswordsDumper.exe" | Out-File -FilePath hash.txt -Encoding ascii
+
+    - name: Get current date
+      id: date
+      shell: pwsh
+      run: echo "timestamp=$(Get-Date -Format 'yyyyMMddHHmm')" >> $env:GITHUB_OUTPUT
+
+    - name: Create Release and Upload Assets
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('rel-{0}', steps.date.outputs.timestamp) }}
+        name: Release ${{ steps.date.outputs.timestamp }}
+        files: |
+          EdgeSavedPasswordsDumper\bin\Release\EdgeSavedPasswordsDumper.exe
+          hash.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
